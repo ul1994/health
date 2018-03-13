@@ -1,7 +1,5 @@
-import skimage
-import skimage.io
-import skimage.transform
 import numpy as np
+import cv2
 
 
 # synset = [l.strip() for l in open('synset.txt').readlines()]
@@ -11,7 +9,8 @@ import numpy as np
 # [height, width, depth]
 def load_image(path):
     # load image
-    img = skimage.io.imread(path)
+    img = cv2.imread(path)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB).astype(np.float32)
     img = img / 255.0
     assert (0 <= img).all() and (img <= 1.0).all()
     # print "Original Image Shape: ", img.shape
@@ -21,7 +20,10 @@ def load_image(path):
     xx = int((img.shape[1] - short_edge) / 2)
     crop_img = img[yy: yy + short_edge, xx: xx + short_edge]
     # resize to 224, 224
-    resized_img = skimage.transform.resize(crop_img, (224, 224))
+    xscale = crop_img.shape[1] / 224.0
+    yscale = crop_img.shape[0] / 224.0
+    resized_img = cv2.resize(crop_img, (0,0), fx=xscale, fy=yscale)
+    #print('IMG', resized_img.shape)
     return resized_img
 
 
@@ -39,26 +41,6 @@ def print_prob(prob, file_path):
     top5 = [(synset[pred[i]], prob[pred[i]]) for i in range(5)]
     print(("Top5: ", top5))
     return top1
-
-
-def load_image2(path, height=None, width=None):
-    # load image
-    img = skimage.io.imread(path)
-    img = img / 255.0
-    if height is not None and width is not None:
-        ny = height
-        nx = width
-    elif height is not None:
-        ny = height
-        nx = img.shape[1] * ny / img.shape[0]
-    elif width is not None:
-        nx = width
-        ny = img.shape[0] * nx / img.shape[1]
-    else:
-        ny = img.shape[0]
-        nx = img.shape[1]
-    return skimage.transform.resize(img, (ny, nx))
-
 
 def test():
     img = skimage.io.imread("./test_data/starry_night.jpg")

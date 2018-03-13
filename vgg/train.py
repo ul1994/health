@@ -11,7 +11,8 @@ import utils
 import numpy as np
 import cv2
 
-DATAPATH = '../data/flower_photos'
+EPOCHS = 1
+DATAPATH = '/beegfs/ua349/flower_photos'
 BATCHSIZE = 32
 DATASPLIT = 0.9
 IMSIZE = 224
@@ -20,9 +21,9 @@ NETSIZE = 1000
 
 def get_image(impath):
 	img = utils.load_image(impath)
-	img = img[:IMSIZE, :IMSIZE, :] # just crop to keep ratio if possible
-	xscale = img.shape[1] / float(IMSIZE)
-	yscale = img.shape[0] / float(IMSIZE)
+	#img = img[:IMSIZE, :IMSIZE, :] # just crop to keep ratio if possible
+	xscale = float(IMSIZE) / img.shape[1]
+	yscale = float(IMSIZE) / img.shape[0]
 	img = cv2.resize(img, (0, 0), fx=xscale, fy=yscale)
 	return img
 
@@ -41,6 +42,10 @@ shuffle(datainds)
 splitat = int(len(datainds)*DATASPLIT)
 dtrain, dtest = datainds[:splitat], datainds[splitat:]
 
+import json
+with open('evaldata.json', 'w') as fl:
+        json.dump(dtest, fl)
+
 sess = tf.Session()
 images = tf.placeholder(tf.float32, [BATCHSIZE, IMSIZE, IMSIZE, CDIM])
 true_out = tf.placeholder(tf.float32, [BATCHSIZE, NETSIZE])
@@ -56,23 +61,25 @@ sess.run(tf.global_variables_initializer())
 cost = tf.reduce_sum((vgg.prob - true_out) ** 2)
 train = tf.train.GradientDescentOptimizer(0.0001).minimize(cost)
 numbatches = int(len(dtrain) / BATCHSIZE)
-for epochi in range(1):
-	print('Epoch:', epochi)
+for epochi in range(EPOCHS):
+	print('Epoch: %d/%d' %(epochi, EPOCHS))
 	for bii in range(numbatches):
 		sys.stdout.write('%d/%d\r' % (bii, numbatches))
 		sys.stdout.flush()
 		batchinds = dtrain[bii*BATCHSIZE:(bii+1) * BATCHSIZE]
 		if len(batchinds) < BATCHSIZE: continue
 		batch = np.array([get_image(metadata[fl][ind]) for fl, ind in batchinds])
-		# print(type(batch))
-		# input()
+		#print(type(batch), batch.shape, batch[0].shape)
+		#input()
 		labels = [[1.0 if lookup[fl] == ii else 0.0 for ii in range(NETSIZE)] for fl, _ in batchinds]
 		sess.run(train, feed_dict={images: batch, true_out: labels, train_mode: True})
 	print()
+	#evalbatch = np.array([get_image(metadata[fl][ind]) for fl, ind in dtest])
+	#evalres = sess.run(vgg.prob, feed_dict={images: evalbatch, train_mode: False})
+	#for 
 
 # test classification again, should have a higher probability about tiger
 # prob = sess.run(vgg.prob, feed_dict={images: batch1, train_mode: False})
 # utils.print_prob(prob[0], './synset.txt')
 
-# test save
-vgg.save_npy(sess, './test-save.npy')
+vgg.save_npy(sess, './checkpoint.npy')
