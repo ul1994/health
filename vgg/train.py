@@ -11,7 +11,7 @@ import utils
 import numpy as np
 import cv2
 
-EPOCHS = 1
+EPOCHS = 32
 DATAPATH = '/beegfs/ua349/flower_photos'
 BATCHSIZE = 32
 DATASPLIT = 0.9

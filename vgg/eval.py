@@ -55,6 +55,8 @@ sess.run(tf.global_variables_initializer())
 cost = tf.reduce_sum((vgg.prob - true_out) ** 2)
 train = tf.train.GradientDescentOptimizer(0.0001).minimize(cost)
 numbatches = int(len(dtest) / BATCHSIZE)
+correct = 0
+tally = 0
 for bii in range(numbatches):
 	batchinds = dtest[bii*BATCHSIZE:(bii+1) * BATCHSIZE]
 	if len(batchinds) < BATCHSIZE: continue
@@ -62,5 +64,8 @@ for bii in range(numbatches):
 	labels = [[1.0 if lookup[fl] == ii else 0.0 for ii in range(NETSIZE)] for fl, _ in batchinds]
 	prob = sess.run(vgg.prob, feed_dict={images: batch, train_mode: False})
 	for ii, ent in enumerate(prob):
-		print(np.argmax(ent), batchinds[ii])
-	input()
+		if np.argmax(ent) == lookup[batchinds[ii][0]]:
+			correct += 1
+		tally += 1
+
+print('%d/%d = %.2f' % (correct, tally, correct / tally))
