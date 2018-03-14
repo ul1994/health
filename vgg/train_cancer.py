@@ -45,10 +45,8 @@ splitat = int(len(datainds)*DATASPLIT)
 dtrain, dtest = datainds[:splitat], datainds[splitat:]
 print('Train/Test Split:', len(dtrain), len(dtest))
 
-input()
-
 import json
-with open('evaldata.json', 'w') as fl:
+with open('evaldata-cancer.json', 'w') as fl:
         json.dump(dtest, fl)
 
 sess = tf.Session()
@@ -56,9 +54,9 @@ images = tf.placeholder(tf.float32, [BATCHSIZE, IMSIZE, IMSIZE, CDIM])
 true_out = tf.placeholder(tf.float32, [BATCHSIZE, NETSIZE])
 train_mode = tf.placeholder(tf.bool)
 
-# vgg = vgg19.Vgg19('./vgg19.npy')
-vgg = vgg19.Vgg19()
-vgg.build(images, train_mode)
+vgg = vgg19.Vgg19('./vgg19.npy')
+# vgg = vgg19.Vgg19()
+vgg.build(images, train_mode, 256)
 
 # print number of variables used: 143667240 variables, i.e. ideal size = 548MB
 print('Trainable vars:', vgg.get_var_count())
@@ -88,4 +86,4 @@ for epochi in range(EPOCHS):
 # prob = sess.run(vgg.prob, feed_dict={images: batch1, train_mode: False})
 # utils.print_prob(prob[0], './synset.txt')
 
-vgg.save_npy(sess, './checkpoint.npy')
+vgg.save_npy(sess, './checkpoint-cancer.npy')
