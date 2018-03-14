@@ -60,6 +60,22 @@ vgg.build(images, train_mode, imsize=IMSIZE)
 # print number of variables used: 143667240 variables, i.e. ideal size = 548MB
 print('Trainable vars:', vgg.get_var_count())
 
+def evaluate():
+	numbatches = int(len(dtest) / BATCHSIZE)
+	correct = 0
+	tally = 0
+	for bii in range(numbatches):
+		batchinds = dtest[bii*BATCHSIZE:(bii+1) * BATCHSIZE]
+		if len(batchinds) < BATCHSIZE: continue
+		batch = np.array([get_image(metadata[fl][ind]) for fl, ind in batchinds])
+		# labels = [[1.0 if lookup[fl] == ii else 0.0 for ii in range(NETSIZE)] for fl, _ in batchinds]
+		prob = sess.run(vgg.prob, feed_dict={images: batch, train_mode: False})
+		for ii, ent in enumerate(prob):
+			if np.argmax(ent) == lookup[batchinds[ii][0]]:
+				correct += 1
+			tally += 1
+	print('%d/%d = %.2f' % (correct, tally, correct / tally))
+
 sess.run(tf.global_variables_initializer())
 cost = tf.reduce_sum((vgg.prob - true_out) ** 2)
 train = tf.train.GradientDescentOptimizer(0.0001).minimize(cost)
@@ -72,11 +88,14 @@ for epochi in range(EPOCHS):
 		batchinds = dtrain[bii*BATCHSIZE:(bii+1) * BATCHSIZE]
 		if len(batchinds) < BATCHSIZE: continue
 		batch = np.array([get_image(metadata[fl][ind]) for fl, ind in batchinds])
-		#print(type(batch), batch.shape, batch[0].shape)
-		#input()
 		labels = [[1.0 if lookup[fl] == ii else 0.0 for ii in range(NETSIZE)] for fl, _ in batchinds]
+		# print(labels[0][:10])
+		# print(labels[1][:10])
+		# input()
 		sess.run(train, feed_dict={images: batch, true_out: labels, train_mode: True})
 	print()
+
+	evaluate()
 	#evalbatch = np.array([get_image(metadata[fl][ind]) for fl, ind in dtest])
 	#evalres = sess.run(vgg.prob, feed_dict={images: evalbatch, train_mode: False})
 	#for
