@@ -135,6 +135,7 @@ class Vgg19:
     def get_var(self, initial_value, name, idx, var_name):
         if self.data_dict is not None and name in self.data_dict:
             value = self.data_dict[name][idx]
+            # print(type(value), value.shape)
         else:
             value = initial_value
 
@@ -146,7 +147,13 @@ class Vgg19:
         self.var_dict[(name, idx)] = var
 
         # print var_name, var.get_shape().as_list()
-        assert var.get_shape() == initial_value.get_shape()
+        # print(var.get_shape(), initial_value.get_shape())
+        try:
+            assert var.get_shape() == initial_value.get_shape()
+        except:
+            print('Loading Mismatch...', var.get_shape(), initial_value.get_shape())
+            var = tf.get_variable(var_name, initial_value.get_shape(), trainable=True)
+            assert var.get_shape() == initial_value.get_shape()
 
         return var
 
