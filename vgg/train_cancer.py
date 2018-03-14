@@ -55,8 +55,7 @@ true_out = tf.placeholder(tf.float32, [BATCHSIZE, NETSIZE])
 train_mode = tf.placeholder(tf.bool)
 
 vgg = vgg19.Vgg19('./vgg19.npy')
-# vgg = vgg19.Vgg19()
-vgg.build(images, train_mode, 256)
+vgg.build(images, train_mode, imsize=IMSIZE)
 
 # print number of variables used: 143667240 variables, i.e. ideal size = 548MB
 print('Trainable vars:', vgg.get_var_count())
