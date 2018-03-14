@@ -11,14 +11,7 @@ import utils
 import numpy as np
 import cv2
 
-EPOCHS = 32
-DATAPATH = '/Users/ulzee/nyu/health/data/tissue128/joined'
-BATCHSIZE = 32
-DATASPLIT = 0.9
-IMSIZE = 256
-CDIM = 3
-NETSIZE = 1000
-LABEL_MODE = 'cancer'
+TASK = 'flower'
 
 def get_image(impath):
 	img = utils.load_image(impath, imsize=IMSIZE)
@@ -28,18 +21,48 @@ def get_image(impath):
 	# img = cv2.resize(img, (0, 0), fx=xscale, fy=yscale)
 	return img
 
-datainds = []
-metadata = {}
-lookup = { 'normals': 0, 'benigns': 1, 'cancers': 2 }
-imgfiles = [fl for fl in os.listdir(DATAPATH) if '.png' in fl]
-for fii, fl in enumerate(imgfiles):
-	rawlabel = fl.split('-')[-1].replace('.png', '')
-	if rawlabel not in metadata: metadata[rawlabel] = []
-	datainds.append((rawlabel, len(metadata[rawlabel])))
-	metadata[rawlabel].append('%s/%s' % (DATAPATH, fl))
-shuffle(datainds)
-for label in metadata:
-	print(label, len(metadata[label]))
+if TASK == 'cancer':
+	EPOCHS = 32
+	DATAPATH = '/Users/ulzee/nyu/health/data/tissue128/joined'
+	BATCHSIZE = 32
+	DATASPLIT = 0.9
+	IMSIZE = 256
+	CDIM = 3
+	NETSIZE = 1000
+
+	datainds = []
+	metadata = {}
+	lookup = { 'normals': 0, 'benigns': 1, 'cancers': 2 }
+	imgfiles = [fl for fl in os.listdir(DATAPATH) if '.png' in fl]
+	for fii, fl in enumerate(imgfiles):
+		rawlabel = fl.split('-')[-1].replace('.png', '')
+		if rawlabel not in metadata: metadata[rawlabel] = []
+		datainds.append((rawlabel, len(metadata[rawlabel])))
+		metadata[rawlabel].append('%s/%s' % (DATAPATH, fl))
+	shuffle(datainds)
+	for label in metadata:
+		print(label, len(metadata[label]))
+
+elif TASK == 'flower':
+	EPOCHS = 32
+	DATAPATH = '/Users/ulzee/nyu/health/data/flower_photos'
+	BATCHSIZE = 32
+	DATASPLIT = 0.9
+	IMSIZE = 224
+	CDIM = 3
+	NETSIZE = 1000
+
+	datainds = []
+	folders = [fl for fl in os.listdir(DATAPATH) if '.' not in fl]
+	metadata = {}
+	lookup = {}
+	for fii, fl in enumerate(folders):
+		if fl not in lookup: lookup[fl] = fii
+		metadata[fl] = ['%s/%s/%s' % (DATAPATH, fl, img) for img in os.listdir('%s/%s' % (DATAPATH, fl)) if '.jpg' in img]
+		for ii in range(len(metadata[fl])):
+			datainds.append((fl, ii))
+		print(fl, len(metadata[fl]))
+	shuffle(datainds)
 
 splitat = int(len(datainds)*DATASPLIT)
 dtrain, dtest = datainds[:splitat], datainds[splitat:]
