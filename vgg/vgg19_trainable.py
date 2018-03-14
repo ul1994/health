@@ -21,7 +21,7 @@ class Vgg19:
         self.trainable = trainable
         self.dropout = dropout
 
-    def build(self, rgb, train_mode=None):
+    def build(self, rgb, train_mode=None, imsize=224):
         """
         load variable from npy to build the VGG
 
@@ -33,15 +33,15 @@ class Vgg19:
 
         # Convert RGB to BGR
         red, green, blue = tf.split(axis=3, num_or_size_splits=3, value=rgb_scaled)
-        assert red.get_shape().as_list()[1:] == [224, 224, 1]
-        assert green.get_shape().as_list()[1:] == [224, 224, 1]
-        assert blue.get_shape().as_list()[1:] == [224, 224, 1]
+        assert red.get_shape().as_list()[1:] == [imsize, imsize, 1]
+        assert green.get_shape().as_list()[1:] == [imsize, imsize, 1]
+        assert blue.get_shape().as_list()[1:] == [imsize, imsize, 1]
         bgr = tf.concat(axis=3, values=[
             blue - VGG_MEAN[0],
             green - VGG_MEAN[1],
             red - VGG_MEAN[2],
         ])
-        assert bgr.get_shape().as_list()[1:] == [224, 224, 3]
+        assert bgr.get_shape().as_list()[1:] == [imsize, imsize, 3]
 
         self.conv1_1 = self.conv_layer(bgr, 3, 64, "conv1_1")
         self.conv1_2 = self.conv_layer(self.conv1_1, 64, 64, "conv1_2")
@@ -69,7 +69,7 @@ class Vgg19:
         self.conv5_4 = self.conv_layer(self.conv5_3, 512, 512, "conv5_4")
         self.pool5 = self.max_pool(self.conv5_4, 'pool5')
 
-        self.fc6 = self.fc_layer(self.pool5, 25088, 4096, "fc6")  # 25088 = ((224 // (2 ** 5)) ** 2) * 512
+        self.fc6 = self.fc_layer(self.pool5, ((imsize // (2 ** 5)) ** 2) * 512, 4096, "fc6")  # 25088 = ((224 // (2 ** 5)) ** 2) * 512
         self.relu6 = tf.nn.relu(self.fc6)
         if train_mode is not None:
             self.relu6 = tf.cond(train_mode, lambda: tf.nn.dropout(self.relu6, self.dropout), lambda: self.relu6)
