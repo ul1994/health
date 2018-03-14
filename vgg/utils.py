@@ -7,7 +7,7 @@ import cv2
 
 # returns image of shape [224, 224, 3]
 # [height, width, depth]
-def load_image(path):
+def load_image(path, imsize=224):
     # load image
     img = cv2.imread(path)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB).astype(np.float32)
@@ -20,8 +20,8 @@ def load_image(path):
     xx = int((img.shape[1] - short_edge) / 2)
     crop_img = img[yy: yy + short_edge, xx: xx + short_edge]
     # resize to 224, 224
-    xscale = crop_img.shape[1] / 224.0
-    yscale = crop_img.shape[0] / 224.0
+    xscale = float(imsize) / crop_img.shape[1]
+    yscale = float(imsize) / crop_img.shape[0]
     resized_img = cv2.resize(crop_img, (0,0), fx=xscale, fy=yscale)
     #print('IMG', resized_img.shape)
     return resized_img
