@@ -20,6 +20,5 @@ module load tensorflow/python3.6/1.5.0
 
 echo "Loaded modules"
 nvidia-smi
-python3 train.py
-python3 eval.py
+python3 $1 $2
 echo "Ended"
