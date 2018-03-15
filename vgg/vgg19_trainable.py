@@ -21,7 +21,7 @@ class Vgg19:
         self.trainable = trainable
         self.dropout = dropout
 
-    def build(self, rgb, train_mode=None, imsize=224):
+    def build(self, rgb, train_mode=None, imsize=224, outsize=1000):
         """
         load variable from npy to build the VGG
 
@@ -83,7 +83,7 @@ class Vgg19:
         elif self.trainable:
             self.relu7 = tf.nn.dropout(self.relu7, self.dropout)
 
-        self.fc8 = self.fc_layer(self.relu7, 4096, 1000, "fc8")
+        self.fc8 = self.fc_layer(self.relu7, 4096, outsize, "fc8")
 
         self.prob = tf.nn.softmax(self.fc8, name="prob")
 

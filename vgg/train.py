@@ -22,35 +22,35 @@ def get_image(impath):
 	return img
 
 if TASK == 'cancer':
-	EPOCHS = 32
-	DATAPATH = '/Users/ulzee/nyu/health/data/tissue128/joined'
+	EPOCHS = 64
+	# DATAPATH = '/beegfs/ua349/data/tissue128/MLO'
+	DATAPATH = '/beegfs/ua349/data/tissue256/CC'
 	BATCHSIZE = 32
 	DATASPLIT = 0.9
 	IMSIZE = 224
 	CDIM = 3
-	NETSIZE = 1000
 
 	datainds = []
+	folders = [fl for fl in os.listdir(DATAPATH) if '.' not in fl]
 	metadata = {}
-	lookup = { 'normals': 0, 'benigns': 1, 'cancers': 2 }
-	imgfiles = [fl for fl in os.listdir(DATAPATH) if '.png' in fl]
-	for fii, fl in enumerate(imgfiles):
-		rawlabel = fl.split('-')[-1].replace('.png', '')
-		if rawlabel not in metadata: metadata[rawlabel] = []
-		datainds.append((rawlabel, len(metadata[rawlabel])))
-		metadata[rawlabel].append('%s/%s' % (DATAPATH, fl))
+	lookup = {}
+	for fii, fl in enumerate(folders):
+		if fl not in lookup: lookup[fl] = fii
+		metadata[fl] = ['%s/%s/%s' % (DATAPATH, fl, img) for img in os.listdir('%s/%s' % (DATAPATH, fl)) if '.png' in img]
+		metadata[fl] = metadata[fl][:1000]
+		for ii in range(len(metadata[fl])):
+			datainds.append((fl, ii))
+		print(fl, len(metadata[fl]))
 	shuffle(datainds)
-	for label in metadata:
-		print(label, len(metadata[label]))
+	OUTSIZE = len(folders)
 
 elif TASK == 'flower':
 	EPOCHS = 32
-	DATAPATH = '/Users/ulzee/nyu/health/data/flower_photos'
+	DATAPATH = '/beegfs/ua349/flower_photos'
 	BATCHSIZE = 32
 	DATASPLIT = 0.9
 	IMSIZE = 224
 	CDIM = 3
-	NETSIZE = 1000
 
 	datainds = []
 	folders = [fl for fl in os.listdir(DATAPATH) if '.' not in fl]
@@ -63,6 +63,7 @@ elif TASK == 'flower':
 			datainds.append((fl, ii))
 		print(fl, len(metadata[fl]))
 	shuffle(datainds)
+	OUTSIZE = len(folders)
 
 splitat = int(len(datainds)*DATASPLIT)
 dtrain, dtest = datainds[:splitat], datainds[splitat:]
@@ -70,11 +71,11 @@ print('Train/Test Split:', len(dtrain), len(dtest))
 
 sess = tf.Session()
 images = tf.placeholder(tf.float32, [BATCHSIZE, IMSIZE, IMSIZE, CDIM])
-true_out = tf.placeholder(tf.float32, [BATCHSIZE, NETSIZE])
+true_out = tf.placeholder(tf.float32, [BATCHSIZE, OUTSIZE])
 train_mode = tf.placeholder(tf.bool)
 
 vgg = vgg19.Vgg19('./vgg19.npy')
-vgg.build(images, train_mode, imsize=IMSIZE)
+vgg.build(images, train_mode, imsize=IMSIZE, outsize=OUTSIZE)
 
 # print number of variables used: 143667240 variables, i.e. ideal size = 548MB
 print('Trainable vars:', vgg.get_var_count())
@@ -83,22 +84,30 @@ def evaluate():
 	numbatches = int(len(dtest) / BATCHSIZE)
 	correct = 0
 	tally = 0
+	maxpred = np.zeros(OUTSIZE)
 	for bii in range(numbatches):
 		batchinds = dtest[bii*BATCHSIZE:(bii+1) * BATCHSIZE]
 		if len(batchinds) < BATCHSIZE: continue
 		batch = np.array([get_image(metadata[fl][ind]) for fl, ind in batchinds])
-		# labels = [[1.0 if lookup[fl] == ii else 0.0 for ii in range(NETSIZE)] for fl, _ in batchinds]
+		# labels = [[1.0 if lookup[fl] == ii else 0.0 for ii in range(OUTSIZE)] for fl, _ in batchinds]
 		prob = sess.run(vgg.prob, feed_dict={images: batch, train_mode: False})
 		for ii, ent in enumerate(prob):
+			maxpred[np.argmax(ent)] += 1
 			if np.argmax(ent) == lookup[batchinds[ii][0]]:
 				correct += 1
 			tally += 1
-	print('%d/%d = %.2f' % (correct, tally, correct / tally))
+
+	maxpred /= np.sum(maxpred)
+	distrib = ' '.join(['%.1f' % val for val in maxpred])
+	print('%d/%d = %.2f   (%s)' % (correct, tally, correct / tally, distrib))
 
 sess.run(tf.global_variables_initializer())
 cost = tf.reduce_sum((vgg.prob - true_out) ** 2)
 train = tf.train.GradientDescentOptimizer(0.0001).minimize(cost)
 numbatches = int(len(dtrain) / BATCHSIZE)
+
+evaluate()
+
 for epochi in range(EPOCHS):
 	print('Epoch: %d/%d' %(epochi, EPOCHS))
 	for bii in range(numbatches):
@@ -107,7 +116,7 @@ for epochi in range(EPOCHS):
 		batchinds = dtrain[bii*BATCHSIZE:(bii+1) * BATCHSIZE]
 		if len(batchinds) < BATCHSIZE: continue
 		batch = np.array([get_image(metadata[fl][ind]) for fl, ind in batchinds])
-		labels = [[1.0 if lookup[fl] == ii else 0.0 for ii in range(NETSIZE)] for fl, _ in batchinds]
+		labels = [[1.0 if lookup[fl] == ii else 0.0 for ii in range(OUTSIZE)] for fl, _ in batchinds]
 		# print(labels[0][:10])
 		# print(labels[1][:10])
 		# input()
@@ -123,4 +132,4 @@ for epochi in range(EPOCHS):
 # prob = sess.run(vgg.prob, feed_dict={images: batch1, train_mode: False})
 # utils.print_prob(prob[0], './synset.txt')
 
-vgg.save_npy(sess, './checkpoint-cancer.npy')
+vgg.save_npy(sess, './checkpoint-%s.npy' % TASK)

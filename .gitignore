@@ -6,3 +6,6 @@ ljpeg/
 *.json
 *.pyc
 samples/
+data
+*.LJPEG
+*.ipynb_checkpoints
