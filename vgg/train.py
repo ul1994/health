@@ -11,7 +11,7 @@ import utils
 import numpy as np
 import cv2
 
-TASK = 'flower'
+TASK = sys.argv[1]
 
 def get_image(impath):
 	img = utils.load_image(impath, imsize=IMSIZE)
@@ -26,7 +26,7 @@ if TASK == 'cancer':
 	DATAPATH = '/Users/ulzee/nyu/health/data/tissue128/joined'
 	BATCHSIZE = 32
 	DATASPLIT = 0.9
-	IMSIZE = 256
+	IMSIZE = 224
 	CDIM = 3
 	NETSIZE = 1000
 
@@ -67,10 +67,6 @@ elif TASK == 'flower':
 splitat = int(len(datainds)*DATASPLIT)
 dtrain, dtest = datainds[:splitat], datainds[splitat:]
 print('Train/Test Split:', len(dtrain), len(dtest))
-
-import json
-with open('evaldata-cancer.json', 'w') as fl:
-        json.dump(dtest, fl)
 
 sess = tf.Session()
 images = tf.placeholder(tf.float32, [BATCHSIZE, IMSIZE, IMSIZE, CDIM])
