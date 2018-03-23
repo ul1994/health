@@ -69,10 +69,6 @@ splitat = int(len(datainds)*DATASPLIT)
 dtrain, dtest = datainds[:splitat], datainds[splitat:]
 print('Train/Test Split:', len(dtrain), len(dtest))
 
-import json
-with open('evaldata-cancer.json', 'w') as fl:
-        json.dump(dtest, fl)
-
 sess = tf.Session()
 images = tf.placeholder(tf.float32, [BATCHSIZE, IMSIZE, IMSIZE, CDIM])
 true_out = tf.placeholder(tf.float32, [BATCHSIZE, OUTSIZE])
