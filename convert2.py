@@ -151,7 +151,7 @@ import PIL
 # DEBUGONE = None
 # DEBUGANGLE = None
 # DEBUGONE = 'B-3025-1'
-DEBUGONE = 'A_1127_1'
+DEBUGONE = 'A-1127-1'
 DEBUGANGLE = 'RIGHT_CC'
 
 def imrotate(img, ang):
@@ -180,7 +180,7 @@ def dump_cancer_samples(ph, sc, density, mask, coords, size=256, facing='left'):
 	for ii in range(16):
 		ridx = random.randint(0, len(coords) - 1)
 		angle = random.randint(-RANDROT, RANDROT)
-		yy, xx = coords[ridx]
+		xx, yy = coords[ridx]
 		yy = clip_zone(yy, hs, len(density))
 		xx = clip_zone(xx, hs, density.shape[1])
 		sample = density[yy-hs:yy+hs,xx-hs:xx+hs]
@@ -363,14 +363,14 @@ if __name__ == '__main__':
 					phenotype = { 'diagnosis': 'cancers' }
 
 
-				plt.figure(figsize=(14, 10))
+				# plt.figure(figsize=(14, 10))
 				markedim = grayscale.copy()
 				all_masks = []
 				for jj, markup in enumerate(scaninfo['details']['markups']):
 					mask, coords, minmax = applyMark(markedim.shape, markup)
 					all_masks.append((mask, coords, minmax))
-					plt.subplot(1, 4, jj+1)
-					plt.imshow(mask.astype(np.float32))
+					# plt.subplot(1, 4, jj+1)
+					# plt.imshow(mask.astype(np.float32))
 
 				def isTighter(bound, check):
 					x0, xf, y0, yf = bound
@@ -396,7 +396,11 @@ if __name__ == '__main__':
 							to_remove.append(mii)
 					keep_masks = np.delete(keep_masks, to_remove)
 					mask_i += 1
-				print(keep_masks)
+				# print(keep_masks)
+				for _, coords, _ in all_masks:
+					for xx, yy in coords:
+						cv2.circle(markedim, (xx, yy), 3, (0, 0, 0))
+				scipy.misc.imsave('sample.png', markedim)
 
 				coords_list = []
 				mask = np.zeros(markedim.shape, dtype=np.uint8)
@@ -406,12 +410,13 @@ if __name__ == '__main__':
 					coords_list += coords
 				mask = mask.astype(np.uint8)
 
-				plt.figure(figsize=(14, 10))
-				plt.imshow(mask.astype(np.float32))
+				# plt.figure(figsize=(14, 10))
+				# plt.subplot(1, 2, 1)
+				# plt.imshow(mask.astype(np.float32))
 
-				plt.show()
-				try: input()
-				except: pass
+				# plt.show()
+				# try: input()
+				# except: pass
 
 				dump_cancer_samples(phenotype, scaninfo, rawod, mask, coords_list, size=256, facing=facing)
 

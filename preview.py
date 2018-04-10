@@ -25,7 +25,10 @@ if __name__ == '__main__':
 
 	DATAROOT = '/media/ul1994/ssd1tb/phenotype-tiles'
 	DIAG = 'cancers'
-	INSPECT = 'A_1043_1.LEFT_CC'
+	# INSPECT = 'A_1043_1.LEFT_CC'
+	# INSPECT = 'B_3511_1.LEFT_CC'
+	# INSPECT = 'B_3504_1.RIGHT_CC'
+	INSPECT = 'A_1127_1.RIGHT_CC'
 
 	fpath ='%s/%s/%s' % (DATAROOT, DIAG, INSPECT)
 	odpath = fpath + '.npy'
