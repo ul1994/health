@@ -35,16 +35,13 @@ def trim(img, xoff=0.02, yoff=0.1):
 	yf = int(hh * (1 - yoff))
 	return img[y0:yf, x0:xf]
 
-def applyMark(img, markup, keepmask=None, oclist=[]):
-	out = img.copy()
+def applyMark(frame, markup):
+	mask = np.zeros(frame, dtype=np.uint8)
 	path = json.loads(markup['trace'])
 	x, y = markup['start']
-	linecolor = (0,255,255)
-	cv2.circle(out, (x, y), 3, linecolor, 4)
-	cv2.circle(out, (x, y), 20, linecolor, 4)
-	minmax = [1000000, 0, 1000000, 0] # xminmax, yminmax
 
-	coords = [(y, x)]
+	minmax = [1000000, 0, 1000000, 0] # xminmax, yminmax
+	coords = [(x, y)]
 	for dy, dx in path:
 		x += dx
 		y += dy
@@ -52,69 +49,39 @@ def applyMark(img, markup, keepmask=None, oclist=[]):
 		minmax[1] = max(x, minmax[1])
 		minmax[2] = min(y, minmax[2])
 		minmax[3] = max(y, minmax[3])
-		cv2.circle(out, (x, y), 3, linecolor, 4)
-		coords.append((y, x))
+		coords.append((x, y))
+		mask[y, x] = 1
 
-	coords = sorted(coords, key=lambda pos: pos[0]*100000+pos[1])
-	# ys, xs = zip(*json.loads(markup['trace']))
-	xmin, xmax, ymin, ymax = minmax
-	xavg, yavg = (xmax + xmin) / 2, (ymax + ymin) / 2
-	xrad, yrad = np.abs((xmax - xmin) / 2.0), np.abs((ymax - ymin) / 2.0)
-	radius = int(max(xrad, yrad))
-	diameter = radius * 2
-	# bigdia = diameter * 2
-	cv2.circle(out, (int(xavg), int(yavg)), radius, linecolor, 4)
-	cv2.circle(out, (int(xavg), int(yavg)), 5, linecolor, 4)
-
-	# print('RADIUS', radius)
-	domain1d = np.linspace(0, 5, diameter)
-	# kern1d = multivariate_normal.pdf(domain1d, mean=2.5, cov=0.5)
-	# kbuffer =
-	kmean = 2.5
-	kern1d = multivariate_normal.pdf(domain1d, mean=kmean, cov=kmean / 5.0)
-	kernel = np.outer(kern1d, kern1d)
-
-
-	if keepmask is None:
-		mask = np.zeros(img.shape)
-	else:
-		mask = keepmask
-	# mask[ymin-radius:ymin+(2 + 1) * radius, xmin-radius:xmin+(2 + 1) * radius] = kernel
-	# print(img.shape, kernel.shape, diameter)
-	fity, fitx = mask[ymin:ymin+diameter, xmin:xmin+diameter].shape
-	kernh, kernw = kernel[:fity, :fitx].shape
-
-	def isInside(box, point):
-		(px0, py0), (pxf, pyf) = box
-		xx, yy = point
-		return px0 <= xx and xx <= pxf and py0 <= yy and yy <= pyf
-
-	is_occluded = False
-	testPoints = [(xmin, ymin), (xmin+kernw, ymin), (xmin, ymin+kernh), (xmin+kernw, ymin+kernh)]
-	for prevBox in oclist:
-		for pnt in testPoints:
-			if isInside(prevBox, pnt):
-				is_occluded = True
-
-	lasty = coords[0][0]
-	lastind = 0
-	for ii, (yy, xx) in enumerate(coords):
-		if yy == lasty:
-			continue
-		x0 = coords[lastind][1]
-		xf = coords[ii - 1][1]
-		mask[lasty, x0:xf] = 1
-		lasty = yy
-		lastind = ii
-
-	# if not is_occluded:
-	# 	kernel *= 1.0 / np.max(kernel)
-	# 	mask[ymin:ymin+diameter, xmin:xmin+diameter] = kernel[:fity, :fitx]
-	# 	oclist.append([(xmin, ymin), (xmin+kernw, ymin+kernh)])
+	contours = np.array(coords)
+	cv2.fillPoly(mask, pts=[contours], color=(255,255,255))
 
 	assert mask is not None
 
-	return out, mask, oclist, coords
+	return mask, coords, minmax
+
+	# xmin, xmax, ymin, ymax = minmax
+
+	# def isInside(box, point):
+	# 	(px0, py0), (pxf, pyf) = box
+	# 	xx, yy = point
+	# 	return px0 <= xx and xx <= pxf and py0 <= yy and yy <= pyf
+	# is_occluded = False
+	# testPoints = [(xmin, ymin), (xmax, ymin), (xmin, ymax), (xmax, ymax)]
+	# for prevBox in oclist:
+	# 	for pnt in testPoints:
+	# 		if isInside(prevBox, pnt):
+	# 			is_occluded = True
+				# TODO: only consider complete occlusion
+
+	# if is_occluded:
+		# something bigger covers this mark
+		# then ignore the bigger mark and keep this one
+		# mask = np.zeros(img.shape)
+
+	# else:
+		# nothing covers this mar
+
+	# return out, mask, oclist, coords
 
 def bbox(img, size=2048, lowcut = 255 * 0.05):
 	maxy = 0
@@ -181,8 +148,11 @@ import PIL
 # DEBUGONE = 'A-1010-1'
 # DEBUGANGLE = 'RIGHT_CC'
 
-DEBUGONE = None
-DEBUGANGLE = None
+# DEBUGONE = None
+# DEBUGANGLE = None
+# DEBUGONE = 'B-3025-1'
+DEBUGONE = 'A_1127_1'
+DEBUGANGLE = 'RIGHT_CC'
 
 def imrotate(img, ang):
 	img = PIL.Image.fromarray(img)
@@ -190,9 +160,16 @@ def imrotate(img, ang):
 	img = np.array(img)
 	return img
 
+def clip_zone(ss, buff, lim):
+	if ss + buff >= lim:
+		ss -= (buff + ss - lim)
+	if ss - buff < 0:
+		ss = buff
+	return ss
+
 def dump_cancer_samples(ph, sc, density, mask, coords, size=256, facing='left'):
 	RANDROT = 30 # +- 15 degrees
-	ROTBUFFER = 50
+	ROTBUFFER = 40
 	pname = '%s/phenotype-tiles/%s/%s' % (DATAROOT, ph['diagnosis'], sc['name'])
 	# bsize = len(density) / (size * 2)
 	hs = size / 2 + ROTBUFFER
@@ -204,8 +181,20 @@ def dump_cancer_samples(ph, sc, density, mask, coords, size=256, facing='left'):
 		ridx = random.randint(0, len(coords) - 1)
 		angle = random.randint(-RANDROT, RANDROT)
 		yy, xx = coords[ridx]
+		yy = clip_zone(yy, hs, len(density))
+		xx = clip_zone(xx, hs, density.shape[1])
 		sample = density[yy-hs:yy+hs,xx-hs:xx+hs]
 		sample_mask = mask[yy-hs:yy+hs,xx-hs:xx+hs]
+		try:
+			assert sample.shape[0] == size + 2*ROTBUFFER and sample.shape[1] == size + 2*ROTBUFFER
+		except:
+			print(yy, xx, density.shape)
+			plt.figure()
+			plt.imshow(density)
+			plt.figure()
+			plt.imshow(sample)
+			plt.show()
+			input()
 		sample = imrotate(sample, angle)
 		sample = sample[ROTBUFFER:-ROTBUFFER,ROTBUFFER:-ROTBUFFER]
 		sample_mask = imrotate(sample_mask, angle)
@@ -213,17 +202,11 @@ def dump_cancer_samples(ph, sc, density, mask, coords, size=256, facing='left'):
 		if facing == 'right':
 			sample = cv2.flip(sample, 1)
 			sample_mask = cv2.flip(sample_mask, 1)
-		density_data[ii] = sample
 		mask_data[ii] = sample_mask
-		# bname = pname + ('-sample-%d' % (ii))
-		# pkl.dump(sample, open(bname + '.pkl', 'wb'))
-		# pkl.dump(sample_mask.astype(np.uint8), open(bname + '-mask.pkl', 'wb'))
-		# np.save(bname + '.npy', sample)
-		# np.save(bname + '-mask.npy', sample_mask.astype(np.uint8))
+		density_data[ii] = sample
 	with h5py.File(pname + '-samples.h5', "w") as fl:
 		fl.create_dataset('density', data=density_data, compression='gzip')
 		fl.create_dataset('mask', data=mask_data, compression='gzip')
-		# mask_db.close()
 
 def dump_tiles(ph, sc, density, mask, marked, size=512):
 	pname = '%s/phenotype-tiles/%s/%s' % (DATAROOT, ph['diagnosis'], sc['name'])
@@ -378,16 +361,57 @@ if __name__ == '__main__':
 				phenotype = { 'diagnosis': 'benigns' }
 				if elem['diagnosis'] == 'cancers':
 					phenotype = { 'diagnosis': 'cancers' }
-				# print('MARKS:', len(scaninfo['details']['markups']))
-				mask = None
+
+
+				plt.figure(figsize=(14, 10))
 				markedim = grayscale.copy()
-				# try:
-				occlusion_list = []
-				coords_list = []
-				oclist = occlusion_list
+				all_masks = []
 				for jj, markup in enumerate(scaninfo['details']['markups']):
-					markedim, mask, oclist, coords = applyMark(markedim, markup, keepmask=mask, oclist=oclist)
+					mask, coords, minmax = applyMark(markedim.shape, markup)
+					all_masks.append((mask, coords, minmax))
+					plt.subplot(1, 4, jj+1)
+					plt.imshow(mask.astype(np.float32))
+
+				def isTighter(bound, check):
+					x0, xf, y0, yf = bound
+					xmin, xmax, ymin, ymax = check
+					checkpoints = [(xmin, ymin), (xmax, ymin), (xmin, ymax), (xmax, ymax)]
+					is_contained = True
+					for pnt in checkpoints:
+						xx, yy = pnt
+						if not (x0 <= xx and xx <= xf and y0 <= yy and yy <= yf):
+							is_contained = False
+					return is_contained
+
+				mask_i = 0
+				keep_masks = np.array([ii for ii in range(len(all_masks))])
+				while mask_i < len(keep_masks):
+					to_remove = [] # only keep tightest bounds
+					_, _, inspect = all_masks[keep_masks[mask_i]]
+					for mii, (compare_ind) in enumerate(keep_masks):
+						if compare_ind == keep_masks[mask_i]: continue
+						mask, coords, minmax = all_masks[compare_ind]
+						if isTighter(minmax, inspect):
+							# a sibling provides a tighter bound, remove this
+							to_remove.append(mii)
+					keep_masks = np.delete(keep_masks, to_remove)
+					mask_i += 1
+				print(keep_masks)
+
+				coords_list = []
+				mask = np.zeros(markedim.shape, dtype=np.uint8)
+				for mask_ind in keep_masks:
+					partmask, coords, _ = all_masks[mask_ind]
+					mask = np.logical_or(partmask, mask)
 					coords_list += coords
+				mask = mask.astype(np.uint8)
+
+				plt.figure(figsize=(14, 10))
+				plt.imshow(mask.astype(np.float32))
+
+				plt.show()
+				try: input()
+				except: pass
 
 				dump_cancer_samples(phenotype, scaninfo, rawod, mask, coords_list, size=256, facing=facing)
 
@@ -405,13 +429,6 @@ if __name__ == '__main__':
 					# as far as phenotype is concerned, it is in normals...
 					phenotype = { 'diagnosis': 'normals' }
 
-				# scipy.misc.imsave(preview_maskpath(phenotype, scaninfo), )
-				# np.save(maskpath(phenotype, scaninfo), final_mask)
-				# scipy.misc.imsave(markedpath(phenotype, scaninfo), )
-				# outmask_preview = 255.0 * final_mask
-				# outmask = final_mask
-				# scale256 = 256 / float(len(final_mask))
-				# outmask = cv2.resize(final_mask, (0, 0), fx=scale256, fy=scale256)
 				outmask = final_mask
 				outmarked = 255.0 * filled_marked[y0:yf, x0:xf]
 
@@ -434,4 +451,4 @@ if __name__ == '__main__':
 		sys.stdout.write('%d: %.2f (eta: %.2f)\r' % (ii, dt, dt * (len(chosen) - ii - 1) / 3600.0))
 		sys.stdout.flush()
 
-		break
+		# break
