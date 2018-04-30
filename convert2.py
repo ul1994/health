@@ -11,6 +11,7 @@ from scipy.stats import multivariate_normal
 import scipy.ndimage.filters as fi
 import cPickle as pkl
 import h5py
+from blacklisted import BLACKLISTED
 
 def canvas(img):
 	if img.shape[1] > img.shape[0]:
@@ -35,22 +36,36 @@ def trim(img, xoff=0.02, yoff=0.1):
 	yf = int(hh * (1 - yoff))
 	return img[y0:yf, x0:xf]
 
-def applyMark(frame, markup):
+def applyMark(name, frame, markupk):
 	mask = np.zeros(frame, dtype=np.uint8)
 	path = json.loads(markup['trace'])
 	x, y = markup['start']
+	x -= 1
+	y -= 1
 
 	minmax = [1000000, 0, 1000000, 0] # xminmax, yminmax
 	coords = [(x, y)]
+	alerted = False
 	for dy, dx in path:
 		x += dx
 		y += dy
-		minmax[0] = min(x, minmax[0])
-		minmax[1] = max(x, minmax[1])
-		minmax[2] = min(y, minmax[2])
-		minmax[3] = max(y, minmax[3])
-		coords.append((x, y))
-		mask[y, x] = 1
+
+		clipx = x
+		clipy = y
+		if x >= frame[1] and not alerted:
+			print('OOB-x', name, frame, x)
+			clipx = frame[1] - 1
+			alerted = True
+		if y >= frame[0] and not alerted:
+			print('OOB-y', name, frame, y)
+			clipy = frame[0] - 1
+			alerted = True
+
+		minmax[0] = min(clipx, minmax[0])
+		minmax[1] = max(clipx, minmax[1])
+		minmax[2] = min(clipy, minmax[2])
+		minmax[3] = max(clipy, minmax[3])
+		coords.append((clipx, clipy))
 
 	contours = np.array(coords)
 	cv2.fillPoly(mask, pts=[contours], color=(255,255,255))
@@ -148,11 +163,12 @@ import PIL
 # DEBUGONE = 'A-1010-1'
 # DEBUGANGLE = 'RIGHT_CC'
 
-# DEBUGONE = None
-# DEBUGANGLE = None
-# DEBUGONE = 'B-3025-1'
-DEBUGONE = 'A-1127-1'
-DEBUGANGLE = 'RIGHT_CC'
+DEBUGONE = None
+DEBUGANGLE = None
+# DEBUGONE = 'B-3497-1'
+# DEBUGONE = 'A-1127-1'
+# DEBUGONE = 'A-1016-1'
+# DEBUGANGLE = 'LEFT_CC'
 
 def imrotate(img, ang):
 	img = PIL.Image.fromarray(img)
@@ -238,7 +254,7 @@ def dump_tiles(ph, sc, density, mask, marked, size=512):
 		fl.create_dataset('mask', data=mask_data, compression='gzip')
 
 def dump(ph, sc, density, mask, marked, size=256):
-	scale = 256 / float(len(final_mask))
+	scale = 256 / float(len(density))
 	if mask is not None:
 		mask = cv2.resize(mask, (0, 0), fx=scale, fy=scale)
 		np.save(maskpath(ph, sc), mask.astype(np.uint8))
@@ -282,11 +298,18 @@ if __name__ == '__main__':
 		if DEBUGONE and elem['name'] != DEBUGONE:
 			continue
 		if ii < skip: continue
+		# print()
+		# print(elem['name'])
 
 		available_scans = elem['scans'].values()
 		if DEBUGANGLE:
 			available_scans =[elem['scans'][DEBUGANGLE]]
 		for scaninfo in available_scans:
+			if elem['name'] in BLACKLISTED:
+				if scaninfo['name'].split('.')[1] in BLACKLISTED[elem['name']]:
+					print()
+					print('Skipping blacklisted:', elem['name'], scaninfo['name'])
+					continue
 			if angle not in scaninfo['name']: continue
 			has_details = 'details' in scaninfo
 			if has_details:
@@ -367,7 +390,7 @@ if __name__ == '__main__':
 				markedim = grayscale.copy()
 				all_masks = []
 				for jj, markup in enumerate(scaninfo['details']['markups']):
-					mask, coords, minmax = applyMark(markedim.shape, markup)
+					mask, coords, minmax = applyMark(scaninfo['name'], markedim.shape, markup)
 					all_masks.append((mask, coords, minmax))
 					# plt.subplot(1, 4, jj+1)
 					# plt.imshow(mask.astype(np.float32))
@@ -384,7 +407,7 @@ if __name__ == '__main__':
 					return is_contained
 
 				mask_i = 0
-				keep_masks = np.array([ii for ii in range(len(all_masks))])
+				keep_masks = np.array([kk for kk in range(len(all_masks))])
 				while mask_i < len(keep_masks):
 					to_remove = [] # only keep tightest bounds
 					_, _, inspect = all_masks[keep_masks[mask_i]]
